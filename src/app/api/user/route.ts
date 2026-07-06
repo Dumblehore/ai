@@ -69,14 +69,15 @@ export async function PUT(req: NextRequest) {
       return NextResponse.json({ error: 'Unauthorized.' }, { status: 401 });
     }
 
-    const { name, email, targetPercentile } = await req.json();
+    const { name, email, targetPercentile, recommendationsJson } = await req.json();
 
     const updated = await prisma.user.update({
       where: { id: userId },
       data: {
         ...(name && { name }),
         ...(email && { email }),
-        ...(targetPercentile && { targetPercentile: +targetPercentile })
+        ...(targetPercentile && { targetPercentile: +targetPercentile }),
+        ...(recommendationsJson && { recommendationsJson })
       }
     });
 
@@ -84,7 +85,8 @@ export async function PUT(req: NextRequest) {
       id: updated.id,
       name: updated.name,
       email: updated.email,
-      targetPercentile: updated.targetPercentile
+      targetPercentile: updated.targetPercentile,
+      recommendationsJson: updated.recommendationsJson
     });
   } catch (error: any) {
     console.error('Error updating user profile:', error);

@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
+import { useApp } from '@/context/AppContext';
 import {
   AreaChart,
   Area,
@@ -20,12 +21,11 @@ import {
   Radar,
   PieChart,
   Pie,
-  Cell,
-  Legend
+  Cell
 } from 'recharts';
 
-// Seed data
-const accuracyData = [
+// Default static benchmarks for empty profiles
+const defaultAccuracyData = [
   { name: 'Mock 1', accuracy: 65, avg: 60 },
   { name: 'Sec QA', accuracy: 72, avg: 62 },
   { name: 'Sec VARC', accuracy: 70, avg: 61 },
@@ -35,7 +35,7 @@ const accuracyData = [
   { name: 'Latest Mock', accuracy: 82, avg: 64 },
 ];
 
-const percentileData = [
+const defaultPercentileData = [
   { date: 'May 15', percentile: 88.4 },
   { date: 'May 30', percentile: 89.2 },
   { date: 'Jun 10', percentile: 91.5 },
@@ -45,28 +45,7 @@ const percentileData = [
   { date: 'Jul 06', percentile: 94.6 },
 ];
 
-const studyHoursData = [
-  { day: 'Mon', hours: 2.5, goal: 3 },
-  { day: 'Tue', hours: 3.2, goal: 3 },
-  { day: 'Wed', hours: 1.8, goal: 3 },
-  { day: 'Thu', hours: 4.0, goal: 3 },
-  { day: 'Fri', hours: 2.8, goal: 3 },
-  { day: 'Sat', hours: 5.1, goal: 4 },
-  { day: 'Sun', hours: 3.5, goal: 4 },
-];
-
-const topicMasteryData = [
-  { topic: 'Arithmetic', score: 88, fullMark: 100 },
-  { topic: 'Algebra', score: 72, fullMark: 100 },
-  { topic: 'Geometry', score: 60, fullMark: 100 },
-  { topic: 'Modern Math', score: 45, fullMark: 100 },
-  { topic: 'DILR Logic', score: 78, fullMark: 100 },
-  { topic: 'DILR Sets', score: 68, fullMark: 100 },
-  { topic: 'VARC Reading', score: 82, fullMark: 100 },
-  { topic: 'VARC Verbal', score: 70, fullMark: 100 },
-];
-
-const timeAllocationData = [
+const defaultTimeAllocationData = [
   { name: 'VARC', value: 45, color: '#6366f1' }, // Indigo
   { name: 'DILR', value: 35, color: '#ec4899' }, // Pink
   { name: 'QA', value: 20, color: '#10b981' },   // Emerald
@@ -74,13 +53,24 @@ const timeAllocationData = [
 
 export const AccuracyChart: React.FC = () => {
   const [mounted, setMounted] = useState(false);
+  const { testHistory } = useApp();
+
   useEffect(() => setMounted(true), []);
   if (!mounted) return <div className="h-64 animate-pulse bg-muted/40 rounded-lg"></div>;
+
+  // Calculate dynamic accuracy trends
+  const historyData = [...testHistory].reverse().map((t, idx) => ({
+    name: t.title.length > 8 ? t.title.substring(0, 8) + '..' : t.title,
+    accuracy: t.accuracy,
+    avg: 64
+  }));
+
+  const data = historyData.length > 0 ? historyData : defaultAccuracyData;
 
   return (
     <div className="h-64 w-full">
       <ResponsiveContainer width="100%" height="100%">
-        <AreaChart data={accuracyData} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
+        <AreaChart data={data} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
           <defs>
             <linearGradient id="colorAccuracy" x1="0" y1="0" x2="0" y2="1">
               <stop offset="5%" stopColor="#6366f1" stopOpacity={0.4}/>
@@ -89,7 +79,7 @@ export const AccuracyChart: React.FC = () => {
           </defs>
           <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="var(--border)" />
           <XAxis dataKey="name" stroke="var(--muted-foreground)" fontSize={11} tickLine={false} />
-          <YAxis domain={[40, 100]} stroke="var(--muted-foreground)" fontSize={11} tickLine={false} />
+          <YAxis domain={[30, 100]} stroke="var(--muted-foreground)" fontSize={11} tickLine={false} />
           <Tooltip 
             contentStyle={{ backgroundColor: 'var(--card)', borderColor: 'var(--border)', color: 'var(--foreground)' }}
           />
@@ -103,16 +93,38 @@ export const AccuracyChart: React.FC = () => {
 
 export const PercentileGrowthChart: React.FC = () => {
   const [mounted, setMounted] = useState(false);
+  const { testHistory } = useApp();
+
   useEffect(() => setMounted(true), []);
   if (!mounted) return <div className="h-64 animate-pulse bg-muted/40 rounded-lg"></div>;
+
+  // Calculate dynamic percentile trend
+  const historyData = [...testHistory].reverse().map((t, idx) => {
+    // Math model to map Raw Score to Percentile
+    const maxScore = t.totalQuestions * 3;
+    const ratio = t.score / maxScore;
+    let pct = 90.0;
+    if (ratio >= 0.65) pct = 99.7 + (ratio - 0.65) * 0.85;
+    else if (ratio >= 0.45) pct = 99.0 + ((ratio - 0.45) / 0.20) * 0.7;
+    else if (ratio >= 0.30) pct = 95.0 + ((ratio - 0.30) / 0.15) * 4.0;
+    else if (ratio >= 0.20) pct = 90.0 + ((ratio - 0.20) / 0.10) * 5.0;
+    else pct = Math.max(50.0, 50.0 + (ratio / 0.10) * 30.0);
+
+    return {
+      date: t.date.substring(5), // MM-DD format
+      percentile: +pct.toFixed(2)
+    };
+  });
+
+  const data = historyData.length > 0 ? historyData : defaultPercentileData;
 
   return (
     <div className="h-64 w-full">
       <ResponsiveContainer width="100%" height="100%">
-        <LineChart data={percentileData} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
+        <LineChart data={data} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
           <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="var(--border)" />
           <XAxis dataKey="date" stroke="var(--muted-foreground)" fontSize={11} tickLine={false} />
-          <YAxis domain={[80, 100]} stroke="var(--muted-foreground)" fontSize={11} tickLine={false} />
+          <YAxis domain={[50, 100]} stroke="var(--muted-foreground)" fontSize={11} tickLine={false} />
           <Tooltip 
             contentStyle={{ backgroundColor: 'var(--card)', borderColor: 'var(--border)', color: 'var(--foreground)' }}
           />
@@ -125,13 +137,44 @@ export const PercentileGrowthChart: React.FC = () => {
 
 export const StudyHoursChart: React.FC = () => {
   const [mounted, setMounted] = useState(false);
+  const { testHistory, user } = useApp();
+
   useEffect(() => setMounted(true), []);
   if (!mounted) return <div className="h-64 animate-pulse bg-muted/40 rounded-lg"></div>;
+
+  // Calculate dynamic weekly study progress
+  const days = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+  const todayIndex = new Date().getDay(); // 0 is Sun
+  const todayDayStr = days[(todayIndex + 6) % 7];
+
+  const testHoursByDay: Record<string, number> = {};
+  days.forEach(d => { testHoursByDay[d] = 0; });
+
+  testHistory.forEach(t => {
+    const testDate = new Date(t.date);
+    const dayStr = days[(testDate.getDay() + 6) % 7];
+    const diffTime = Math.abs(new Date().getTime() - testDate.getTime());
+    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+    if (diffDays <= 7) {
+      testHoursByDay[dayStr] += t.timeSpent / 3600; // convert to hours
+    }
+  });
+
+  // Blend in current day study hours today
+  if (user) {
+    testHoursByDay[todayDayStr] = Math.max(testHoursByDay[todayDayStr], user.studyHoursToday);
+  }
+
+  const data = days.map(d => ({
+    day: d,
+    hours: +(testHoursByDay[d] || 0.5).toFixed(1), // min styling baseline
+    goal: d === 'Sat' || d === 'Sun' ? 4 : 3
+  }));
 
   return (
     <div className="h-64 w-full">
       <ResponsiveContainer width="100%" height="100%">
-        <BarChart data={studyHoursData} margin={{ top: 10, right: 5, left: -20, bottom: 0 }}>
+        <BarChart data={data} margin={{ top: 10, right: 5, left: -20, bottom: 0 }}>
           <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="var(--border)" />
           <XAxis dataKey="day" stroke="var(--muted-foreground)" fontSize={11} tickLine={false} />
           <YAxis stroke="var(--muted-foreground)" fontSize={11} tickLine={false} />
@@ -148,20 +191,58 @@ export const StudyHoursChart: React.FC = () => {
 
 export const TopicMasteryChart: React.FC = () => {
   const [mounted, setMounted] = useState(false);
+  const { testHistory } = useApp();
+
   useEffect(() => setMounted(true), []);
   if (!mounted) return <div className="h-64 animate-pulse bg-muted/40 rounded-lg"></div>;
+
+  // Compile mastery indices by parsing individual answers
+  const topicScores: Record<string, { correct: number; total: number }> = {
+    'Arithmetic': { correct: 8, total: 10 },
+    'Algebra': { correct: 7, total: 10 },
+    'Geometry': { correct: 6, total: 10 },
+    'Modern Math': { correct: 4, total: 10 },
+    'DILR Logic': { correct: 8, total: 10 },
+    'DILR Sets': { correct: 7, total: 10 },
+    'VARC Reading': { correct: 8, total: 10 },
+    'VARC Verbal': { correct: 7, total: 10 },
+  };
+
+  testHistory.forEach(attempt => {
+    attempt.questionsAnswered?.forEach(ans => {
+      let topicKey = 'Arithmetic';
+      const qId = ans.questionId.toLowerCase();
+      if (qId.includes('alg')) topicKey = 'Algebra';
+      else if (qId.includes('geo')) topicKey = 'Geometry';
+      else if (qId.includes('mod') || qId.includes('num')) topicKey = 'Modern Math';
+      else if (qId.includes('set') || qId.includes('venn')) topicKey = 'DILR Sets';
+      else if (qId.includes('arr') || qId.includes('logic')) topicKey = 'DILR Logic';
+      else if (qId.includes('rc') || qId.includes('read')) topicKey = 'VARC Reading';
+      else if (qId.includes('pj') || qId.includes('verb')) topicKey = 'VARC Verbal';
+      
+      if (topicScores[topicKey]) {
+        topicScores[topicKey].total += 1;
+        if (ans.isCorrect) {
+          topicScores[topicKey].correct += 1;
+        }
+      }
+    });
+  });
+
+  const data = Object.keys(topicScores).map(topic => ({
+    topic,
+    score: Math.round((topicScores[topic].correct / topicScores[topic].total) * 100),
+    fullMark: 100
+  }));
 
   return (
     <div className="h-64 w-full">
       <ResponsiveContainer width="100%" height="100%">
-        <RadarChart cx="50%" cy="50%" outerRadius="70%" data={topicMasteryData}>
+        <RadarChart cx="50%" cy="50%" outerRadius="70%" data={data}>
           <PolarGrid stroke="var(--border)" />
           <PolarAngleAxis dataKey="topic" stroke="var(--muted-foreground)" fontSize={10} />
           <PolarRadiusAxis angle={30} domain={[0, 100]} stroke="var(--border)" fontSize={9} />
           <Radar name="Mastery" dataKey="score" stroke="#8b5cf6" fill="#8b5cf6" fillOpacity={0.3} />
-          <Tooltip 
-            contentStyle={{ backgroundColor: 'var(--card)', borderColor: 'var(--border)', color: 'var(--foreground)' }}
-          />
         </RadarChart>
       </ResponsiveContainer>
     </div>
@@ -170,8 +251,33 @@ export const TopicMasteryChart: React.FC = () => {
 
 export const TimeAllocationChart: React.FC = () => {
   const [mounted, setMounted] = useState(false);
+  const { testHistory } = useApp();
+
   useEffect(() => setMounted(true), []);
   if (!mounted) return <div className="h-64 animate-pulse bg-muted/40 rounded-lg"></div>;
+
+  let varcTime = 0;
+  let dilrTime = 0;
+  let qaTime = 0;
+
+  testHistory.forEach(t => {
+    t.questionsAnswered?.forEach(ans => {
+      const qId = ans.questionId.toLowerCase();
+      if (qId.startsWith('varc')) varcTime += ans.timeSpent;
+      else if (qId.startsWith('dilr')) dilrTime += ans.timeSpent;
+      else if (qId.startsWith('qa')) qaTime += ans.timeSpent;
+    });
+  });
+
+  const total = varcTime + dilrTime + qaTime;
+  let data = defaultTimeAllocationData;
+  if (total > 0) {
+    data = [
+      { name: 'VARC', value: Math.round((varcTime / total) * 100), color: '#6366f1' },
+      { name: 'DILR', value: Math.round((dilrTime / total) * 100), color: '#ec4899' },
+      { name: 'QA', value: Math.round((qaTime / total) * 100), color: '#10b981' }
+    ];
+  }
 
   return (
     <div className="h-64 w-full flex flex-col justify-between">
@@ -179,7 +285,7 @@ export const TimeAllocationChart: React.FC = () => {
         <ResponsiveContainer width="100%" height="100%">
           <PieChart>
             <Pie
-              data={timeAllocationData}
+              data={data}
               cx="50%"
               cy="50%"
               innerRadius={55}
@@ -187,19 +293,16 @@ export const TimeAllocationChart: React.FC = () => {
               paddingAngle={4}
               dataKey="value"
             >
-              {timeAllocationData.map((entry, index) => (
+              {data.map((entry, index) => (
                 <Cell key={`cell-${index}`} fill={entry.color} />
               ))}
             </Pie>
-            <Tooltip 
-              contentStyle={{ backgroundColor: 'var(--card)', borderColor: 'var(--border)', color: 'var(--foreground)' }}
-            />
           </PieChart>
         </ResponsiveContainer>
       </div>
 
       <div className="flex justify-center gap-6 pb-2">
-        {timeAllocationData.map((item, i) => (
+        {data.map((item, i) => (
           <div key={i} className="flex items-center gap-1.5">
             <div className="h-3 w-3 rounded-full" style={{ backgroundColor: item.color }}></div>
             <span className="text-xs font-medium text-foreground">{item.name} ({item.value}%)</span>

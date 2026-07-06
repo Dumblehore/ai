@@ -15,6 +15,8 @@ export interface UserProfile {
   accuracy: number;
   aiReadinessScore: number;
   lastActiveDate: string;
+  recommendationsJson: string;
+  role: string;
 }
 
 export interface TestAttempt {
@@ -114,6 +116,7 @@ interface AppContextType {
   addGoal: (title: string, targetValue: number, metric: string, category: Goal['category']) => void;
   addQuestion: (q: Omit<Question, 'id'>) => void;
   deleteQuestion: (id: string) => void;
+  toggleRecommendation: (id: string) => void;
 }
 
 const AppContext = createContext<AppContextType | undefined>(undefined);
@@ -346,6 +349,26 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     }
   };
 
+  const toggleRecommendation = async (id: string) => {
+    if (!user) return;
+    try {
+      const recs = JSON.parse(user.recommendationsJson || '[]');
+      const updated = recs.map((r: any) => (r.id === id ? { ...r, done: !r.done } : r));
+      const recommendationsJson = JSON.stringify(updated);
+
+      // Optimistic state update
+      setUser({ ...user, recommendationsJson });
+
+      await fetch('/api/user', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ recommendationsJson })
+      });
+    } catch (e) {
+      console.error('Error toggling recommendation:', e);
+    }
+  };
+
   return (
     <AppContext.Provider
       value={{
@@ -369,6 +392,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         addGoal,
         addQuestion,
         deleteQuestion,
+        toggleRecommendation,
       }}
     >
       {children}

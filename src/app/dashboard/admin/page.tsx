@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useApp } from '@/context/AppContext';
 import { Question } from '@/data/questionsBank';
 import { 
@@ -14,11 +14,13 @@ import {
   HelpCircle,
   FileSpreadsheet,
   AlertTriangle,
-  X
+  X,
+  Lock
 } from 'lucide-react';
+import Link from 'next/link';
 
 export default function AdminPanel() {
-  const { questions, addQuestion, deleteQuestion } = useApp();
+  const { questions, addQuestion, deleteQuestion, user } = useApp();
   const [activeTab, setActiveTab] = useState<'questions' | 'csv' | 'users'>('questions');
 
   // Form State for creating new questions
@@ -40,13 +42,45 @@ export default function AdminPanel() {
   const [csvPreview, setCsvPreview] = useState<string>('');
   const [importStatus, setImportStatus] = useState<string | null>(null);
 
-  // Mock Enrolled Users List
-  const mockUsers = [
-    { email: 'yash@example.com', name: 'Yash Mohan', role: 'Student', percentile: 94.6, tests: 7 },
-    { email: 'rohan@b-school.in', name: 'Rohan Sharma', role: 'Student', percentile: 98.2, tests: 12 },
-    { email: 'tanvi@iim.ac.in', name: 'Tanvi Kapoor', role: 'Student', percentile: 99.1, tests: 19 },
-    { email: 'mentor_admin@aether.ai', name: 'Aether Mentor Admin', role: 'Super Admin', percentile: 100, tests: 0 },
-  ];
+  // Live Users from Database
+  const [liveUsers, setLiveUsers] = useState<any[]>([]);
+  const [loadingUsers, setLoadingUsers] = useState(false);
+
+  useEffect(() => {
+    if (user && user.role === 'admin') {
+      setLoadingUsers(true);
+      fetch('/api/admin/users')
+        .then((res) => (res.ok ? res.json() : []))
+        .then((data) => {
+          setLiveUsers(data);
+          setLoadingUsers(false);
+        })
+        .catch((e) => {
+          console.error(e);
+          setLoadingUsers(false);
+        });
+    }
+  }, [user]);
+
+  // Authorization Shield
+  if (!user || user.role !== 'admin') {
+    return (
+      <div className="flex flex-col items-center justify-center p-12 text-center bg-card border border-border rounded-2xl max-w-md mx-auto space-y-5 shadow-sm">
+        <div className="h-14 w-14 rounded-full bg-red-500/10 flex items-center justify-center text-red-600">
+          <Lock size={28} />
+        </div>
+        <div className="space-y-2">
+          <h2 className="text-lg font-bold text-foreground">Access Denied</h2>
+          <p className="text-xs text-muted-foreground leading-relaxed">
+            The Admin operations workspace is restricted. Please sign in with an authorized administrator account to manage mock bank databases.
+          </p>
+        </div>
+        <Link href="/dashboard" className="w-full bg-primary hover:bg-primary/95 text-white font-bold py-2.5 rounded-xl text-xs transition shadow-sm text-center">
+          Return to Student Dashboard
+        </Link>
+      </div>
+    );
+  }
 
   const handleOptionChange = (idx: number, val: string) => {
     const updated = [...options];
@@ -306,23 +340,37 @@ export default function AdminPanel() {
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-border/60">
-                  {mockUsers.map((u) => (
-                    <tr key={u.email} className="hover:bg-secondary/20">
-                      <td className="py-4">
-                        <span className="font-bold text-foreground block">{u.name}</span>
-                        <span className="text-[10px] text-muted-foreground block">{u.email}</span>
+                  {loadingUsers ? (
+                    <tr>
+                      <td colSpan={4} className="py-8 text-center text-muted-foreground animate-pulse font-medium">
+                        Loading live candidate registry...
                       </td>
-                      <td className="py-4">
-                        <span className={`px-2 py-0.5 rounded font-bold text-[9px] uppercase ${
-                          u.role === 'Super Admin' ? 'bg-primary/10 text-primary' : 'bg-secondary text-muted-foreground'
-                        }`}>
-                          {u.role}
-                        </span>
-                      </td>
-                      <td className="py-4 text-center font-bold text-foreground">{u.tests} Mocks</td>
-                      <td className="py-4 text-center text-primary font-extrabold text-sm">{u.percentile}%ile</td>
                     </tr>
-                  ))}
+                  ) : liveUsers.length === 0 ? (
+                    <tr>
+                      <td colSpan={4} className="py-8 text-center text-muted-foreground font-medium">
+                        No candidates registered.
+                      </td>
+                    </tr>
+                  ) : (
+                    liveUsers.map((u) => (
+                      <tr key={u.email} className="hover:bg-secondary/20">
+                        <td className="py-4">
+                          <span className="font-bold text-foreground block">{u.name}</span>
+                          <span className="text-[10px] text-muted-foreground block">{u.email}</span>
+                        </td>
+                        <td className="py-4">
+                          <span className={`px-2 py-0.5 rounded font-bold text-[9px] uppercase ${
+                            u.role === 'admin' ? 'bg-primary/10 text-primary' : 'bg-secondary text-muted-foreground'
+                          }`}>
+                            {u.role}
+                          </span>
+                        </td>
+                        <td className="py-4 text-center font-bold text-foreground">{u.completedTestsCount} Mocks</td>
+                        <td className="py-4 text-center text-primary font-extrabold text-sm">{u.estimatedPercentile}%ile</td>
+                      </tr>
+                    ))
+                  )}
                 </tbody>
               </table>
             </div>

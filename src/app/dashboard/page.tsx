@@ -25,27 +25,33 @@ import Link from 'next/link';
 import { motion } from 'framer-motion';
 
 export default function HomeDashboard() {
-  const { user, activeGoals, achievements } = useApp();
+  const { user, activeGoals, achievements, toggleRecommendation } = useApp();
   const [chartTab, setChartTab] = useState<'analytics' | 'activity' | 'mastery'>('analytics');
+
+  const recommendations = React.useMemo(() => {
+    try {
+      if (user?.recommendationsJson) {
+        return JSON.parse(user.recommendationsJson);
+      }
+    } catch (e) {
+      console.error(e);
+    }
+    return [
+      { id: 'rec-1', text: 'Solve 2 Reading Comprehension sets', time: '40m', done: false, type: 'VARC' },
+      { id: 'rec-2', text: 'Practice 20 Arithmetic Questions', time: '45m', done: false, type: 'QA' },
+      { id: 'rec-3', text: 'Analyze 1 Logical Seating Arrangement set', time: '30m', done: true, type: 'DILR' },
+      { id: 'rec-4', text: 'Revise Geometry formula flashcards', time: '15m', done: false, type: 'Revision' },
+      { id: 'rec-5', text: 'Review Spaced Repetition Due Cards', time: '20m', done: false, type: 'Revision' },
+    ];
+  }, [user?.recommendationsJson]);
 
   if (!user) return null;
 
-  // Today's recommendations checklist state (local state for interactivity)
-  const initialRecommendations = [
-    { id: 'rec-1', text: 'Solve 2 Reading Comprehension sets', time: '40m', done: false, type: 'VARC' },
-    { id: 'rec-2', text: 'Practice 20 Arithmetic Questions', time: '45m', done: false, type: 'QA' },
-    { id: 'rec-3', text: 'Analyze 1 Logical Seating Arrangement set', time: '30m', done: true, type: 'DILR' },
-    { id: 'rec-4', text: 'Revise Geometry formula flashcards', time: '15m', done: false, type: 'Revision' },
-    { id: 'rec-5', text: 'Review Spaced Repetition Due Cards', time: '20m', done: false, type: 'Revision' },
-  ];
-
-  const [recommendations, setRecommendations] = useState(initialRecommendations);
-
   const toggleRec = (id: string) => {
-    setRecommendations(recommendations.map(r => r.id === id ? { ...r, done: !r.done } : r));
+    toggleRecommendation(id);
   };
 
-  const completedRecCount = recommendations.filter(r => r.done).length;
+  const completedRecCount = recommendations.filter((r: any) => r.done).length;
 
   return (
     <div className="space-y-8">
@@ -62,7 +68,7 @@ export default function HomeDashboard() {
               Welcome back, <span className="bg-gradient-to-r from-primary to-purple-500 bg-clip-text text-transparent">{user.name}</span>!
             </h1>
             <p className="text-muted-foreground text-sm max-w-lg">
-              Your AI Mentor has generated a fresh daily plan based on your recent 75% accuracy in QA Arithmetic.
+              Your AI Mentor has generated a fresh daily plan based on your recent {user.accuracy}% overall accuracy.
             </p>
           </div>
           <Link href="/dashboard/test">
@@ -114,7 +120,7 @@ export default function HomeDashboard() {
                 <span className="text-2xl font-bold tracking-tight text-foreground">{user.studyHoursToday}</span>
                 <span className="text-xs font-medium text-muted-foreground">Hrs</span>
               </div>
-              <span className="text-[10px] text-muted-foreground block">Today\'s study session</span>
+              <span className="text-[10px] text-muted-foreground block">Today's study session</span>
             </div>
           </div>
 
@@ -213,7 +219,7 @@ export default function HomeDashboard() {
 
             {/* Checklist */}
             <div className="space-y-3">
-              {recommendations.map((rec) => (
+              {recommendations.map((rec: any) => (
                 <div 
                   key={rec.id}
                   onClick={() => toggleRec(rec.id)}

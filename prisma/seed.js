@@ -17,11 +17,21 @@ async function main() {
 
   // 2. Create default user
   const hashedPassword = bcrypt.hashSync('password123', 10);
+  const defaultRecs = [
+    { id: 'rec-1', text: 'Solve 2 Reading Comprehension sets', time: '40m', done: false, type: 'VARC' },
+    { id: 'rec-2', text: 'Practice 20 Arithmetic Questions', time: '45m', done: false, type: 'QA' },
+    { id: 'rec-3', text: 'Analyze 1 Logical Seating Arrangement set', time: '30m', done: true, type: 'DILR' },
+    { id: 'rec-4', text: 'Revise Geometry formula flashcards', time: '15m', done: false, type: 'Revision' },
+    { id: 'rec-5', text: 'Review Spaced Repetition Due Cards', time: '20m', done: false, type: 'Revision' },
+  ];
+
   const user = await prisma.user.create({
     data: {
       name: 'Yash Mohan',
       email: 'yash@example.com',
       password: hashedPassword,
+      role: 'student',
+      recommendationsJson: JSON.stringify(defaultRecs),
       targetPercentile: 99.5,
       estimatedPercentile: 94.6,
       studyStreak: 8,
@@ -34,7 +44,26 @@ async function main() {
     }
   });
 
-  console.log(`Created default user: ${user.email}`);
+  const adminHashed = bcrypt.hashSync('admin123', 10);
+  const admin = await prisma.user.create({
+    data: {
+      name: 'Aether Mentor Admin',
+      email: 'admin@aether.ai',
+      password: adminHashed,
+      role: 'admin',
+      targetPercentile: 99.9,
+      estimatedPercentile: 99.9,
+      studyStreak: 100,
+      studyHoursToday: 0.0,
+      solvedCount: 1000,
+      completedTestsCount: 50,
+      accuracy: 95,
+      aiReadinessScore: 99,
+      lastActiveDate: new Date().toISOString().split('T')[0]
+    }
+  });
+
+  console.log(`Created default user: ${user.email} and admin: ${admin.email}`);
 
   // 3. Create default goals
   await prisma.goal.createMany({

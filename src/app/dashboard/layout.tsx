@@ -88,7 +88,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
     { href: '/dashboard/flashcards', icon: <Sparkles size={18} />, label: 'Flashcards' },
     { href: '/dashboard/goals', icon: <Target size={18} />, label: 'Goals & Badges' },
     { href: '/dashboard/profile', icon: <User size={18} />, label: 'My Mentor Profile' },
-    { href: '/dashboard/admin', icon: <Settings size={18} />, label: 'Admin Panel' },
+    ...(user.role === 'admin' ? [{ href: '/dashboard/admin', icon: <Settings size={18} />, label: 'Admin Panel' }] : []),
   ];
 
   return (

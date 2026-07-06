@@ -10,6 +10,8 @@ export default function LandingPage() {
   const router = useRouter();
   const [email, setEmail] = useState('');
   const [name, setName] = useState('');
+  const [password, setPassword] = useState('');
+  const [errorMsg, setErrorMsg] = useState('');
   const [loading, setLoading] = useState(false);
   const [isSignUp, setIsSignUp] = useState(false);
 
@@ -20,25 +22,36 @@ export default function LandingPage() {
     }
   }, [user, router]);
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!email) return;
+    if (!email || !password) return;
 
     setLoading(true);
-    setTimeout(() => {
-      login(email, name || undefined);
-      setLoading(false);
+    setErrorMsg('');
+    const success = await login(email, name || undefined, password, isSignUp);
+    setLoading(false);
+
+    if (success) {
       router.push('/dashboard');
-    }, 1200);
+    } else {
+      setErrorMsg(isSignUp 
+        ? 'Registration failed. Email might already exist.' 
+        : 'Authentication failed. Please verify email and password.'
+      );
+    }
   };
 
-  const handleGoogleLogin = () => {
+  const handleGoogleLogin = async () => {
     setLoading(true);
-    setTimeout(() => {
-      login('google_user@gmail.com', 'Google Student');
-      setLoading(false);
+    setErrorMsg('');
+    // Automatically log in as the default seeded administrator for easy previewing
+    const success = await login('admin@aether.ai', undefined, 'admin123', false);
+    setLoading(false);
+    if (success) {
       router.push('/dashboard');
-    }, 1000);
+    } else {
+      setErrorMsg('Failed to initialize Admin demo credentials.');
+    }
   };
 
   return (
@@ -59,6 +72,7 @@ export default function LandingPage() {
           <button 
             onClick={() => {
               setIsSignUp(false);
+              setErrorMsg('');
               document.getElementById('auth-section')?.scrollIntoView({ behavior: 'smooth' });
             }}
             className="text-sm font-semibold hover:text-primary transition"
@@ -68,6 +82,7 @@ export default function LandingPage() {
           <button 
             onClick={() => {
               setIsSignUp(true);
+              setErrorMsg('');
               document.getElementById('auth-section')?.scrollIntoView({ behavior: 'smooth' });
             }}
             className="bg-primary hover:bg-primary/90 text-sm font-semibold px-4 py-2 rounded-lg transition shadow-md shadow-primary/20"
@@ -130,6 +145,12 @@ export default function LandingPage() {
               </p>
             </div>
 
+            {errorMsg && (
+              <div className="mb-4 p-3 bg-red-500/10 border border-red-500/20 text-red-400 rounded-xl text-xs font-semibold flex items-center gap-2">
+                <ShieldAlert size={14} /> {errorMsg}
+              </div>
+            )}
+
             <form onSubmit={handleSubmit} className="space-y-4">
               {isSignUp && (
                 <div>
@@ -157,6 +178,18 @@ export default function LandingPage() {
                 />
               </div>
 
+              <div>
+                <label className="block text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-1.5">Password</label>
+                <input
+                  type="password"
+                  required
+                  placeholder="••••••••"
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  className="w-full bg-white/5 border border-white/10 focus:border-primary/50 focus:ring-1 focus:ring-primary/50 rounded-lg px-4 py-2.5 text-sm outline-none transition-all"
+                />
+              </div>
+
               <button
                 type="submit"
                 disabled={loading}
@@ -174,23 +207,27 @@ export default function LandingPage() {
 
             <div className="relative my-6 text-center">
               <div className="absolute inset-0 flex items-center"><div className="w-full border-t border-white/10" /></div>
-              <span className="relative bg-[#0d0d0f] px-3 text-xs text-muted-foreground uppercase">Or continue with</span>
+              <span className="relative bg-[#0d0d0f] px-3 text-xs text-muted-foreground uppercase">Or Demo Sign In</span>
             </div>
 
             <button
               onClick={handleGoogleLogin}
               disabled={loading}
               className="w-full bg-white/[0.02] hover:bg-white/[0.06] border border-white/10 text-white font-semibold py-2.5 rounded-lg text-sm transition-all flex items-center justify-center gap-3"
+              title="Click to automatically sign in as the seed Admin account"
             >
               <svg className="h-4 w-4" viewBox="0 0 24 24">
                 <path fill="#EA4335" d="M12.24 10.285V14.4h6.887c-.648 2.41-2.519 4.13-5.136 4.13A5.71 5.71 0 0 1 8.28 12.8a5.71 5.71 0 0 1 5.711-5.73 5.62 5.62 0 0 1 3.86 1.53l3.05-3.048A9.94 9.94 0 0 0 13.99 3c-5.523 0-10 4.477-10 10s4.477 10 10 10c5.78 0 9.77-4.07 9.77-9.93 0-.6-.05-1.185-.15-1.785H12.24z"/>
               </svg>
-              Google Account
+              Sign In as Admin (One-Click)
             </button>
 
             <div className="mt-6 text-center text-xs">
               <button 
-                onClick={() => setIsSignUp(!isSignUp)}
+                onClick={() => {
+                  setIsSignUp(!isSignUp);
+                  setErrorMsg('');
+                }}
                 className="text-muted-foreground hover:text-primary transition"
               >
                 {isSignUp ? 'Already have an account? Sign In' : 'New student? Create an account'}

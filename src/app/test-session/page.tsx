@@ -16,7 +16,8 @@ import {
   Minimize2,
   Sparkles,
   ClipboardList,
-  Clock
+  Clock,
+  AlertTriangle
 } from 'lucide-react';
 
 // Sub-component that reads search parameters
@@ -45,6 +46,7 @@ const ExamSimulator: React.FC = () => {
   const [calcDisplay, setCalcDisplay] = useState('0');
   const [showSubmitModal, setShowSubmitModal] = useState(false);
   const [isFullscreen, setIsFullscreen] = useState(false);
+  const [fallbackTriggered, setFallbackTriggered] = useState(false);
 
   // Post-Test Mistake Survey States
   const [showSurvey, setShowSurvey] = useState(false);
@@ -67,15 +69,17 @@ const ExamSimulator: React.FC = () => {
       qList = qList.filter(q => q.difficulty === paramDiff);
     }
 
-    // 3. Shuffle or slice
-    qList = qList.slice(0, paramQCount);
-
+    // 3. Shuffle and slice
+    let fallback = false;
     if (qList.length === 0) {
-      // Fallback to avoid empty test
-      qList = questions.slice(0, 5);
+      qList = [...questions].sort(() => Math.random() - 0.5).slice(0, Math.min(5, questions.length));
+      fallback = true;
+    } else {
+      qList = qList.sort(() => Math.random() - 0.5).slice(0, paramQCount);
     }
 
     setFilteredQuestions(qList);
+    setFallbackTriggered(fallback);
 
     // Initialize statuses
     const initialStatuses: typeof questionStatuses = {};
@@ -130,21 +134,24 @@ const ExamSimulator: React.FC = () => {
     const handleKeyDown = (e: KeyboardEvent) => {
       if (showSubmitModal || showSurvey) return;
 
-      if (e.key === 'ArrowRight' || e.key === 's') {
-        // Save & Next shortcut
+      // Scoping: Ignore shortcuts if the user is currently typing in an input field
+      const activeEl = document.activeElement;
+      if (activeEl && (activeEl.tagName === 'INPUT' || activeEl.tagName === 'TEXTAREA')) {
+        return;
+      }
+
+      // Check key combos first to avoid priority collisions
+      if (e.key === 'c' && e.ctrlKey) {
+        e.preventDefault();
+        setIsCalculatorOpen(prev => !prev);
+      } else if (e.key === 'ArrowRight' || e.key === 's') {
         handleSaveNext();
       } else if (e.key === 'ArrowLeft' || e.key === 'p') {
-        // Prev question shortcut
         handlePrev();
       } else if (e.key === 'm') {
-        // Mark for review
         handleMarkReview();
       } else if (e.key === 'c') {
-        // Clear response
         handleClearResponse();
-      } else if (e.key === 'c' && e.ctrlKey) {
-        // Toggle calculator
-        setIsCalculatorOpen(prev => !prev);
       }
     };
 
@@ -366,8 +373,15 @@ const ExamSimulator: React.FC = () => {
           expr += ')';
         }
 
-        const result = new Function(`return ${expr}`)();
-        setCalcDisplay(Number(result).toFixed(4).replace(/\.?0+$/, '')); // clean float display
+        // Security sanitation: Strip out all allowed mathematical terms.
+        // If anything other than safe symbols remains, block evaluation.
+        const checkExpr = expr.replace(/Math\.(sin|cos|tan|log|log10|sqrt|PI|E)/g, '').replace(/[0-9+\-*/().\s]/g, '');
+        if (checkExpr.length === 0) {
+          const result = new Function(`return ${expr}`)();
+          setCalcDisplay(Number(result).toFixed(4).replace(/\.?0+$/, '')); // clean float display
+        } else {
+          setCalcDisplay('Error');
+        }
       } catch {
         setCalcDisplay('Error');
       }
@@ -433,22 +447,29 @@ const ExamSimulator: React.FC = () => {
       {/* Candidate Profile Details & Active Section Tabs */}
       <div className="bg-[#e5e7eb] px-4 py-2 border-b border-slate-300 flex flex-col md:flex-row justify-between items-stretch md:items-center gap-3 select-none">
         {/* Section Tabs */}
-        <div className="flex gap-1 text-xs">
-          {(['VARC', 'DILR', 'QA'] as const).map((sec) => {
-            const isSecActive = activeQuestion.section === sec;
-            return (
-              <span
-                key={sec}
-                className={`px-4 py-2 font-bold rounded-t-lg transition border-t border-x ${
-                  isSecActive 
-                    ? 'bg-white border-slate-300 text-blue-800 shadow-sm relative top-[1px]' 
-                    : 'bg-slate-200/80 border-slate-200 text-slate-500 opacity-60'
-                }`}
-              >
-                Section: {sec}
-              </span>
-            );
-          })}
+        <div className="flex items-center gap-4">
+          <div className="flex gap-1 text-xs font-bold">
+            {(['VARC', 'DILR', 'QA'] as const).map((sec) => {
+              const isSecActive = activeQuestion.section === sec;
+              return (
+                <span
+                  key={sec}
+                  className={`px-4 py-2 rounded-t-lg transition border-t border-x ${
+                    isSecActive 
+                      ? 'bg-white border-slate-300 text-blue-800 shadow-sm relative top-[1px]' 
+                      : 'bg-slate-200/80 border-slate-200 text-slate-500 opacity-60'
+                  }`}
+                >
+                  Section: {sec}
+                </span>
+              );
+            })}
+          </div>
+          {fallbackTriggered && (
+            <span className="bg-amber-100 dark:bg-amber-900/20 border border-amber-300 dark:border-amber-700/40 text-amber-800 dark:text-amber-400 text-[10px] font-bold px-2 py-0.5 rounded flex items-center gap-1 shadow-sm">
+              <AlertTriangle size={12} /> Notice: Insufficient matching questions. Fallback practice set loaded.
+            </span>
+          )}
         </div>
 
         {/* Candidate Detail Card */}
@@ -737,7 +758,8 @@ const ExamSimulator: React.FC = () => {
                       <option value="Careless Mistake">Careless Mistake (silly error/read values wrongly)</option>
                       <option value="Misread Question">Misread Question (missed a constraint or double negatives)</option>
                       <option value="Poor Time Management">Poor Time Management (rushed the calculation under pressure)</option>
-                      <option value="Lucky Guess">Incorrect Elimination (eliminated correct option first)</option>
+                      <option value="Lucky Guess">Lucky Guess (guessed correctly but did not know logic)</option>
+                      <option value="Incorrect Elimination">Incorrect Elimination (eliminated correct option first)</option>
                       <option value="Panic Under Time Pressure">Panic (blindly guessed due to clock running out)</option>
                     </select>
                   </div>
