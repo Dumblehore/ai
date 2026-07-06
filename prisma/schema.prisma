@@ -1,0 +1,106 @@
+datasource db {
+  provider = "sqlite"
+  url      = "file:./dev.db"
+}
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+model User {
+  id                  String        @id @default(uuid())
+  name                String
+  email               String        @unique
+  password            String
+  targetPercentile    Float         @default(99.5)
+  estimatedPercentile Float         @default(90.0)
+  studyStreak         Int           @default(0)
+  studyHoursToday     Float         @default(0.0)
+  solvedCount         Int           @default(0)
+  completedTestsCount Int           @default(0)
+  accuracy            Float         @default(0.0)
+  aiReadinessScore    Int           @default(50)
+  lastActiveDate      String?
+  createdAt           DateTime      @default(now())
+  
+  attempts            TestAttempt[]
+  goals               Goal[]
+  spacedCards         SpacedCard[]
+  flashcards          Flashcard[]
+  chatMessages        ChatMessage[]
+}
+
+model TestAttempt {
+  id             String           @id @default(uuid())
+  title          String
+  type           String // 'Full Mock' | 'Sectional' | 'Topic-wise' | 'Custom'
+  date           String
+  totalQuestions Int
+  attempted      Int
+  correct        Int
+  score          Int
+  accuracy       Float
+  timeSpent      Int // in seconds
+  
+  userId         String
+  user           User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  answers        QuestionAnswer[]
+}
+
+model QuestionAnswer {
+  id          String      @id @default(uuid())
+  attemptId   String
+  attempt     TestAttempt @relation(fields: [attemptId], references: [id], onDelete: Cascade)
+  
+  questionId  String
+  userAnswer  String
+  isCorrect   Boolean
+  timeSpent   Int
+  mistakeType String? // e.g., 'Careless Mistake', 'Conceptual Error'
+}
+
+model Goal {
+  id           String @id @default(uuid())
+  title        String
+  targetValue  Float
+  currentValue Float  @default(0.0)
+  metric       String
+  category     String // 'algebra' | 'mock-tests' | 'study-hours' | 'accuracy' | 'questions'
+  
+  userId       String
+  user         User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model Flashcard {
+  id         String  @id @default(uuid())
+  category   String // 'Formula' | 'Vocabulary' | 'Shortcut' | 'Concept'
+  front      String
+  back       String
+  isFavorite Boolean @default(false)
+  topic      String?
+  
+  userId     String
+  user       User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model SpacedCard {
+  id             String @id @default(uuid())
+  questionId     String
+  intervalDays   Int    @default(1) // 1, 3, 7, 14, 30
+  nextReviewDate String // YYYY-MM-DD
+  historyJson    String @default("[]") // Store history entries as JSON string: [{date, correct}]
+  
+  userId         String
+  user           User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model ChatMessage {
+  id        String   @id @default(uuid())
+  sender    String // 'user' | 'ai'
+  text      String
+  timestamp String // e.g. '08:30 AM'
+  createdAt DateTime @default(now())
+  
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
