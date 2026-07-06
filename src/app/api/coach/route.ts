@@ -2,11 +2,19 @@ import { NextRequest, NextResponse } from 'next/server';
 import prisma from '@/lib/prisma';
 import { getUserIdFromRequest } from '@/lib/auth';
 import { GoogleGenerativeAI } from '@google/generative-ai';
+import { checkRateLimit, getClientIp } from '@/lib/rateLimit';
 
-const GEMINI_API_KEY = process.env.GEMINI_API_KEY || process.env.NEXT_PUBLIC_GEMINI_API_KEY || '';
+const GEMINI_API_KEY = process.env.GEMINI_API_KEY || '';
 
 export async function POST(req: NextRequest) {
   try {
+    const ip = getClientIp(req);
+    if (checkRateLimit(`coach_${ip}`, 15, 60000)) {
+      return NextResponse.json(
+        { error: 'AI Coach rate limit exceeded. Please wait a minute before sending more queries.' },
+        { status: 429 }
+      );
+    }
     const userId = getUserIdFromRequest(req);
     if (!userId) {
       return NextResponse.json({ error: 'Unauthorized.' }, { status: 401 });
@@ -18,7 +26,7 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Message text is required.' }, { status: 400 });
     }
 
-    // 1. Fetch user data to build prompt context
+    // 1. Fetch user profile context
     const user = await prisma.user.findUnique({
       where: { id: userId },
       include: {
@@ -33,6 +41,23 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'User profile not found.' }, { status: 404 });
     }
 
+    // 2. Fetch last 10 chat messages to initialize conversational memory
+    const lastMessages = await prisma.chatMessage.findMany({
+      where: { userId },
+      orderBy: { createdAt: 'desc' },
+      take: 10
+    });
+
+    // Sort to ascending chronological order
+    const sortedHistory = [...lastMessages].reverse();
+
+    // Map to Gemini SDK history model format
+    // Filter out the very latest message if it was already saved (to prevent loop recursion)
+    const chatHistory = sortedHistory.map(msg => ({
+      role: msg.sender === 'user' ? 'user' as const : 'model' as const,
+      parts: [{ text: msg.text }]
+    }));
+
     // Save User message in DB
     const timeString = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
     const userMsg = await prisma.chatMessage.create({
@@ -44,10 +69,9 @@ export async function POST(req: NextRequest) {
       }
     });
 
-    // 2. Build personalized system context for the LLM
+    // 3. System Instructions for AI Mentor Persona
     const recentScores = user.attempts.map(a => `${a.title}: Score ${a.score} (${a.accuracy}% Accuracy)`).join('\n');
-    
-    const systemPrompt = `You are AetherCAT, a world-class personal mentor for the Indian Common Admission Test (CAT) preparation.
+    const systemInstruction = `You are AetherCAT, a world-class personal mentor for the Indian Common Admission Test (CAT) preparation.
 Your student is named ${user.name}.
 Student Performance Profile:
 - Target CAT Percentile: ${user.targetPercentile}%ile
@@ -66,24 +90,31 @@ Instructions:
 - Be extremely motivating but professional, using markdown for structures.
 - Reference the student's stats directly in your answer where appropriate.
 - Keep the response relatively concise (2-3 paragraphs max).
-
-Student Question: "${text}"`;
+- Utilize the chat history to remember preceding questions and context.`;
 
     let aiResponseText = '';
 
-    // 3. Call Gemini API if Key is present
+    // 4. Generate response using Gemini API or local fallback
     if (GEMINI_API_KEY) {
       try {
         const genAI = new GoogleGenerativeAI(GEMINI_API_KEY);
-        const model = genAI.getGenerativeModel({ model: 'gemini-1.5-flash' });
-        const result = await model.generateContent(systemPrompt);
+        const model = genAI.getGenerativeModel({ 
+          model: 'gemini-1.5-flash',
+          systemInstruction
+        });
+
+        // Start multi-turn chat session
+        const chat = model.startChat({
+          history: chatHistory
+        });
+
+        const result = await chat.sendMessage(text);
         aiResponseText = result.response.text();
       } catch (apiError) {
-        console.error('Gemini API execution error, falling back:', apiError);
+        console.error('Gemini API error, executing fallback:', apiError);
         aiResponseText = getLocalMentorFallback(text, user);
       }
     } else {
-      // 4. Fallback to local heuristic engine
       aiResponseText = getLocalMentorFallback(text, user);
     }
 
@@ -108,7 +139,7 @@ Student Question: "${text}"`;
   }
 }
 
-// Local mentor responses matching student profile
+// Local fallback heuristics
 function getLocalMentorFallback(query: string, user: any): string {
   const q = query.toLowerCase();
   

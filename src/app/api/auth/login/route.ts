@@ -2,9 +2,17 @@ import { NextRequest, NextResponse } from 'next/server';
 import bcrypt from 'bcryptjs';
 import prisma from '@/lib/prisma';
 import { generateToken } from '@/lib/auth';
+import { checkRateLimit, getClientIp } from '@/lib/rateLimit';
 
 export async function POST(req: NextRequest) {
   try {
+    const ip = getClientIp(req);
+    if (checkRateLimit(`login_${ip}`, 10, 60000)) {
+      return NextResponse.json(
+        { error: 'Too many login attempts. Please try again in a minute.' },
+        { status: 429 }
+      );
+    }
     const { email, password } = await req.json();
 
     if (!email || !password) {
@@ -69,6 +77,7 @@ export async function POST(req: NextRequest) {
       id: updatedUser.id,
       name: updatedUser.name,
       email: updatedUser.email,
+      role: updatedUser.role,
       targetPercentile: updatedUser.targetPercentile,
       estimatedPercentile: updatedUser.estimatedPercentile,
       studyStreak: updatedUser.studyStreak,

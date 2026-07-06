@@ -30,6 +30,7 @@ export interface TestAttempt {
   score: number;
   accuracy: number;
   timeSpent: number;
+  percentile: number;
   sectionBreakdown: {
     VARC: { attempted: number; correct: number; timeSpent: number };
     DILR: { attempted: number; correct: number; timeSpent: number };
@@ -190,10 +191,22 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   // Sync on mount
   useEffect(() => {
     syncStateFromApi();
-    const storedQuestions = localStorage.getItem('cat_custom_questions');
-    if (storedQuestions) {
-      setQuestions([...initialQuestions, ...JSON.parse(storedQuestions)]);
-    }
+    const fetchQuestions = async () => {
+      try {
+        const res = await fetch('/api/questions');
+        if (res.ok) {
+          const data = await res.json();
+          if (data && Array.isArray(data) && data.length > 0) {
+            setQuestions(data);
+            return;
+          }
+        }
+      } catch (e) {
+        console.error('API questions fetch failed, falling back to static questions bank:', e);
+      }
+      setQuestions(initialQuestions);
+    };
+    fetchQuestions();
   }, []);
 
   const login = async (email: string, name?: string, password?: string, isSignUp = false): Promise<boolean> => {
@@ -331,21 +344,36 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     }
   };
 
-  const addQuestion = (qData: Omit<Question, 'id'>) => {
-    const id = 'custom-' + Math.random().toString(36).substr(2, 9);
-    const newQ: Question = { ...qData, id };
-    const customList = [...questions.filter((q) => q.id.startsWith('custom-')), newQ];
-    localStorage.setItem('cat_custom_questions', JSON.stringify(customList));
-    setQuestions([...questions, newQ]);
+  const addQuestion = async (qData: Omit<Question, 'id'>) => {
+    try {
+      const res = await fetch('/api/questions', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(qData)
+      });
+      if (res.ok) {
+        const newQ = await res.json();
+        const formatted: Question = {
+          ...newQ,
+          options: newQ.optionsJson ? JSON.parse(newQ.optionsJson) : undefined
+        };
+        setQuestions([...questions, formatted]);
+      }
+    } catch (e) {
+      console.error('Failed to create question:', e);
+    }
   };
 
-  const deleteQuestion = (id: string) => {
-    const updatedQuestions = questions.filter((q) => q.id !== id);
-    setQuestions(updatedQuestions);
-
-    if (id.startsWith('custom-')) {
-      const customList = updatedQuestions.filter((q) => q.id.startsWith('custom-'));
-      localStorage.setItem('cat_custom_questions', JSON.stringify(customList));
+  const deleteQuestion = async (id: string) => {
+    try {
+      const res = await fetch(`/api/questions?id=${id}`, {
+        method: 'DELETE'
+      });
+      if (res.ok) {
+        setQuestions(questions.filter(q => q.id !== id));
+      }
+    } catch (e) {
+      console.error('Failed to delete question:', e);
     }
   };
 

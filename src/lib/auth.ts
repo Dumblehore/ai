@@ -9,10 +9,16 @@ export interface TokenPayload {
 }
 
 export function generateToken(payload: TokenPayload): string {
+  if (process.env.NODE_ENV === 'production' && (!process.env.JWT_SECRET || process.env.JWT_SECRET === 'aethercat_secure_secret_token_key_123')) {
+    throw new Error("FATAL CONFIG ERROR: JWT_SECRET must be explicitly defined in production mode to prevent credential forgery.");
+  }
   return jwt.sign(payload, JWT_SECRET, { expiresIn: '7d' });
 }
 
 export function verifyToken(token: string): TokenPayload | null {
+  if (process.env.NODE_ENV === 'production' && (!process.env.JWT_SECRET || process.env.JWT_SECRET === 'aethercat_secure_secret_token_key_123')) {
+    throw new Error("FATAL CONFIG ERROR: JWT_SECRET must be explicitly defined in production mode to prevent credential forgery.");
+  }
   try {
     return jwt.verify(token, JWT_SECRET) as TokenPayload;
   } catch {

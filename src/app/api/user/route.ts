@@ -34,6 +34,7 @@ export async function GET(req: NextRequest) {
         id: user.id,
         name: user.name,
         email: user.email,
+        role: user.role,
         targetPercentile: user.targetPercentile,
         estimatedPercentile: user.estimatedPercentile,
         studyStreak: user.studyStreak,
@@ -42,7 +43,8 @@ export async function GET(req: NextRequest) {
         completedTestsCount: user.completedTestsCount,
         accuracy: user.accuracy,
         aiReadinessScore: user.aiReadinessScore,
-        lastActiveDate: user.lastActiveDate
+        lastActiveDate: user.lastActiveDate,
+        recommendationsJson: user.recommendationsJson
       },
       testHistory: user.attempts,
       activeGoals: user.goals,
@@ -85,6 +87,7 @@ export async function PUT(req: NextRequest) {
       id: updated.id,
       name: updated.name,
       email: updated.email,
+      role: updated.role,
       targetPercentile: updated.targetPercentile,
       recommendationsJson: updated.recommendationsJson
     });

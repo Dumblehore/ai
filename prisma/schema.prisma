@@ -43,6 +43,7 @@ model TestAttempt {
   score          Int
   accuracy       Float
   timeSpent      Int // in seconds
+  percentile     Float            @default(90.0)
   
   userId         String
   user           User             @relation(fields: [userId], references: [id], onDelete: Cascade)
@@ -105,4 +106,21 @@ model ChatMessage {
   
   userId    String
   user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model Question {
+  id            String   @id @default(uuid())
+  section       String   // 'VARC' | 'DILR' | 'QA'
+  topic         String
+  subtopic      String?
+  passage       String?
+  type          String   // 'MCQ' | 'TITA'
+  questionText  String
+  optionsJson   String?  // Store options as stringified JSON: '["A", "B", "C", "D"]' for MCQ
+  correctAnswer String
+  explanation   String
+  shortcut      String?
+  trap          String?
+  difficulty    String   // 'Easy' | 'Medium' | 'Hard'
+  idealTime     Int      @default(90)
 }

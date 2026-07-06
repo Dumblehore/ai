@@ -2,9 +2,17 @@ import { NextRequest, NextResponse } from 'next/server';
 import bcrypt from 'bcryptjs';
 import prisma from '@/lib/prisma';
 import { generateToken } from '@/lib/auth';
+import { checkRateLimit, getClientIp } from '@/lib/rateLimit';
 
 export async function POST(req: NextRequest) {
   try {
+    const ip = getClientIp(req);
+    if (checkRateLimit(`register_${ip}`, 10, 60000)) {
+      return NextResponse.json(
+        { error: 'Too many registration requests. Please try again in a minute.' },
+        { status: 429 }
+      );
+    }
     const { name, email, password } = await req.json();
 
     if (!name || !email || !password) {
@@ -55,6 +63,7 @@ export async function POST(req: NextRequest) {
       id: user.id,
       name: user.name,
       email: user.email,
+      role: user.role,
       targetPercentile: user.targetPercentile,
       estimatedPercentile: user.estimatedPercentile,
       studyStreak: user.studyStreak,

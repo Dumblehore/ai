@@ -336,6 +336,7 @@ const ExamSimulator: React.FC = () => {
       score,
       accuracy,
       timeSpent,
+      percentile: 90.0,
       sectionBreakdown,
       mistakeCounts,
       questionsAnswered,

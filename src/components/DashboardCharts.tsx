@@ -99,22 +99,10 @@ export const PercentileGrowthChart: React.FC = () => {
   if (!mounted) return <div className="h-64 animate-pulse bg-muted/40 rounded-lg"></div>;
 
   // Calculate dynamic percentile trend
-  const historyData = [...testHistory].reverse().map((t, idx) => {
-    // Math model to map Raw Score to Percentile
-    const maxScore = t.totalQuestions * 3;
-    const ratio = t.score / maxScore;
-    let pct = 90.0;
-    if (ratio >= 0.65) pct = 99.7 + (ratio - 0.65) * 0.85;
-    else if (ratio >= 0.45) pct = 99.0 + ((ratio - 0.45) / 0.20) * 0.7;
-    else if (ratio >= 0.30) pct = 95.0 + ((ratio - 0.30) / 0.15) * 4.0;
-    else if (ratio >= 0.20) pct = 90.0 + ((ratio - 0.20) / 0.10) * 5.0;
-    else pct = Math.max(50.0, 50.0 + (ratio / 0.10) * 30.0);
-
-    return {
-      date: t.date.substring(5), // MM-DD format
-      percentile: +pct.toFixed(2)
-    };
-  });
+  const historyData = [...testHistory].reverse().map((t, idx) => ({
+    date: t.date.substring(5), // MM-DD format
+    percentile: t.percentile || 90.0
+  }));
 
   const data = historyData.length > 0 ? historyData : defaultPercentileData;
 

@@ -1,39 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import prisma from '@/lib/prisma';
 import { getUserIdFromRequest } from '@/lib/auth';
-
-// Statistical scoring mapping based on actual CAT score distributions
-// CAT total marks is 198 (66 questions). Our simulator adapts to varying mock question counts.
-// We model score percentage (achieved score / max possible score).
-function calculateCatPercentile(score: number, maxScore: number): number {
-  if (maxScore <= 0) return 90.0;
-  
-  const ratio = score / maxScore;
-
-  if (ratio >= 0.65) {
-    // 99.7%ile to 99.99%ile
-    return +(99.7 + (ratio - 0.65) * 0.85).toFixed(2);
-  }
-  if (ratio >= 0.45) {
-    // 99.0%ile to 99.7%ile
-    return +(99.0 + ((ratio - 0.45) / 0.20) * 0.7).toFixed(2);
-  }
-  if (ratio >= 0.30) {
-    // 95.0%ile to 99.0%ile
-    return +(95.0 + ((ratio - 0.30) / 0.15) * 4.0).toFixed(2);
-  }
-  if (ratio >= 0.20) {
-    // 90.0%ile to 95.0%ile
-    return +(90.0 + ((ratio - 0.20) / 0.10) * 5.0).toFixed(2);
-  }
-  if (ratio >= 0.10) {
-    // 80.0%ile to 90.0%ile
-    return +(80.0 + ((ratio - 0.10) / 0.10) * 10.0).toFixed(2);
-  }
-  
-  // Under 80%ile range
-  return Math.max(50.0, +(50.0 + (ratio / 0.10) * 30.0).toFixed(2));
-}
+import { calculateCatPercentile } from '@/lib/percentile';
 
 export async function POST(req: NextRequest) {
   try {
@@ -46,15 +14,13 @@ export async function POST(req: NextRequest) {
       title,
       type,
       totalQuestions,
-      attempted,
-      correct,
-      score,
-      accuracy,
       timeSpent,
-      sectionBreakdown,
-      mistakeCounts,
       questionsAnswered
     } = await req.json();
+
+    if (!questionsAnswered || !Array.isArray(questionsAnswered)) {
+      return NextResponse.json({ error: 'Missing answer log data.' }, { status: 400 });
+    }
 
     // Fetch active user profile
     const user = await prisma.user.findUnique({
@@ -65,27 +31,85 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'User not found.' }, { status: 404 });
     }
 
-    // 1. Calculate realistic percentile based on actual CAT distributions
+    // 1. Server-Side Correctness & Score Validation
+    // Fetch central mock bank questions
+    const dbQuestions = await prisma.question.findMany({});
+    const questionMap = new Map(dbQuestions.map(q => [q.id, q]));
+
+    let calculatedCorrect = 0;
+    let calculatedAttempted = 0;
+    let calculatedScore = 0;
+
+    const validatedAnswers = questionsAnswered.map((ans: any) => {
+      const q = questionMap.get(ans.questionId);
+      
+      // Fallback for custom user admin questions not in database bank
+      if (!q) {
+        const isUserAnswered = ans.userAnswer !== undefined && ans.userAnswer !== null && ans.userAnswer.trim() !== '';
+        if (isUserAnswered) {
+          calculatedAttempted++;
+          if (ans.isCorrect) {
+            calculatedCorrect++;
+            calculatedScore += 3;
+          } else {
+            // default penalty
+            calculatedScore -= (ans.type === 'TITA' ? 0 : 1);
+          }
+        }
+        return ans;
+      }
+
+      const isUserAnswered = ans.userAnswer !== undefined && ans.userAnswer !== null && ans.userAnswer.trim() !== '';
+      const isCorrect = isUserAnswered && q.correctAnswer.trim().toLowerCase() === ans.userAnswer.trim().toLowerCase();
+
+      if (isUserAnswered) {
+        calculatedAttempted++;
+        if (isCorrect) {
+          calculatedCorrect++;
+          calculatedScore += 3;
+        } else {
+          // Apply negative marking for MCQ only
+          const isMcq = q.type === 'MCQ';
+          if (isMcq) {
+            calculatedScore -= 1;
+          }
+        }
+      }
+
+      return {
+        questionId: ans.questionId,
+        userAnswer: ans.userAnswer,
+        isCorrect,
+        timeSpent: ans.timeSpent,
+        mistakeType: ans.mistakeType
+      };
+    });
+
+    const calculatedAccuracy = calculatedAttempted > 0 
+      ? Math.round((calculatedCorrect / calculatedAttempted) * 100) 
+      : 0;
+
+    // 2. Calculate realistic percentile based on actual CAT distributions
     const maxPossibleScore = totalQuestions * 3;
-    const attemptPercentile = calculateCatPercentile(score, maxPossibleScore);
+    const attemptPercentile = calculateCatPercentile(calculatedScore, maxPossibleScore);
 
     // Dynamic smoothing filter: User percentile updates gradually (70% weight on history, 30% on latest mock)
     const currentPercentile = user.estimatedPercentile || 90.0;
     const newPercentile = +(currentPercentile * 0.7 + attemptPercentile * 0.3).toFixed(2);
 
     // Recalculate User Profile Stats
-    const updatedSolvedCount = user.solvedCount + attempted;
+    const updatedSolvedCount = user.solvedCount + calculatedAttempted;
     const updatedCompletedTests = user.completedTestsCount + 1;
     const updatedAccuracy = user.solvedCount > 0 
-      ? Math.round(((user.accuracy * user.solvedCount) + (accuracy * attempted)) / updatedSolvedCount)
-      : accuracy;
+      ? Math.round(((user.accuracy * user.solvedCount) + (calculatedAccuracy * calculatedAttempted)) / updatedSolvedCount)
+      : calculatedAccuracy;
 
     const newAIReadinessScore = Math.min(
       100,
       Math.max(45, Math.round(updatedAccuracy * 0.85 + (updatedCompletedTests * 1.5)))
     );
 
-    // 2. Database Transactions to write all records safely
+    // 3. Database Transactions to write all records safely
     const result = await prisma.$transaction(async (tx) => {
       // Create Test Attempt
       const attempt = await tx.testAttempt.create({
@@ -94,14 +118,15 @@ export async function POST(req: NextRequest) {
           type,
           date: new Date().toISOString().split('T')[0],
           totalQuestions,
-          attempted,
-          correct,
-          score,
-          accuracy,
+          attempted: calculatedAttempted,
+          correct: calculatedCorrect,
+          score: calculatedScore,
+          accuracy: calculatedAccuracy,
           timeSpent,
+          percentile: attemptPercentile, // Snapshotted test percentile
           userId,
           answers: {
-            create: questionsAnswered.map((q: any) => ({
+            create: validatedAnswers.map((q: any) => ({
               questionId: q.questionId,
               userAnswer: q.userAnswer,
               isCorrect: q.isCorrect,
@@ -114,8 +139,7 @@ export async function POST(req: NextRequest) {
       });
 
       // Spawns Spaced Cards for incorrect answers
-      const todayISO = new Date().toISOString().split('T')[0];
-      const incorrectQuestions = questionsAnswered.filter((q: any) => !q.isCorrect && q.userAnswer !== '');
+      const incorrectQuestions = validatedAnswers.filter((q: any) => !q.isCorrect && q.userAnswer !== '');
 
       for (const q of incorrectQuestions) {
         // Schedule next review for tomorrow (1 day interval)
@@ -173,12 +197,12 @@ export async function POST(req: NextRequest) {
         } else if (goal.category === 'questions') {
           await tx.goal.update({
             where: { id: goal.id },
-            data: { currentValue: Math.min(goal.targetValue, goal.currentValue + attempted) }
+            data: { currentValue: Math.min(goal.targetValue, goal.currentValue + calculatedAttempted) }
           });
         } else if (goal.category === 'accuracy' && title.toLowerCase().includes('qa')) {
           await tx.goal.update({
             where: { id: goal.id },
-            data: { currentValue: Math.round((goal.currentValue + accuracy) / 2) }
+            data: { currentValue: Math.round((goal.currentValue + calculatedAccuracy) / 2) }
           });
         }
       }

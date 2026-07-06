@@ -28,23 +28,30 @@ export default function MentorProfile() {
 
   if (!user) return null;
 
-  const handleSave = (e: React.FormEvent) => {
+  const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
     
-    // Simulate updating user profile in AppContext/localStorage
-    const updatedUser: UserProfile = {
-      ...user,
-      name,
-      email,
-      targetPercentile: +targetPercentile
-    };
-    localStorage.setItem('cat_user', JSON.stringify(updatedUser));
-    
-    setSavedSuccess(true);
-    setTimeout(() => {
-      setSavedSuccess(false);
-      window.location.reload(); // Reload context
-    }, 1200);
+    try {
+      const res = await fetch('/api/user', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          name,
+          email,
+          targetPercentile: +targetPercentile
+        })
+      });
+      
+      if (res.ok) {
+        setSavedSuccess(true);
+        setTimeout(() => {
+          setSavedSuccess(false);
+          window.location.reload(); // Reload context to sync
+        }, 1200);
+      }
+    } catch (e) {
+      console.error('Failed to save profile changes:', e);
+    }
   };
 
   // Generate GitHub-style study heatmap grid (last 12 weeks = 84 days)
