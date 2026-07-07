@@ -3,6 +3,10 @@
 import React, { useState, useEffect, useRef, Suspense } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { useApp, TestAttempt } from '@/context/AppContext';
+import ReactMarkdown from 'react-markdown';
+import remarkMath from 'remark-math';
+import rehypeKatex from 'rehype-katex';
+import 'katex/dist/katex.min.css';
 import { 
   Sparkles, 
   MessageSquare, 
@@ -185,7 +189,17 @@ const CoachContent: React.FC = () => {
                             ? 'bg-secondary/60 text-foreground border border-border/40 rounded-tl-none' 
                             : 'bg-primary text-primary-foreground rounded-tr-none'
                         }`}>
-                          {msg.text}
+                          {isAi ? (
+                            <ReactMarkdown 
+                              remarkPlugins={[remarkMath]} 
+                              rehypePlugins={[rehypeKatex]}
+                              className="prose dark:prose-invert max-w-none text-xs break-words space-y-1.5"
+                            >
+                              {msg.text}
+                            </ReactMarkdown>
+                          ) : (
+                            msg.text
+                          )}
                         </div>
                         <span className="text-[9px] text-muted-foreground block px-1">{msg.timestamp}</span>
                       </div>
@@ -364,13 +378,19 @@ const CoachContent: React.FC = () => {
                       </div>
 
                       <div className="bg-secondary/40 border border-border p-3 rounded-xl font-medium leading-relaxed text-foreground truncate max-h-16 whitespace-normal overflow-y-auto">
-                        {details.questionText}
+                        <ReactMarkdown remarkPlugins={[remarkMath]} rehypePlugins={[rehypeKatex]}>
+                          {details.questionText}
+                        </ReactMarkdown>
                       </div>
 
                       <div className="space-y-2">
                         <div>
                           <span className="font-bold text-emerald-600 dark:text-emerald-400 block">✓ Step-by-Step Explanation:</span>
-                          <p className="text-muted-foreground leading-normal mt-0.5">{details.explanation}</p>
+                          <div className="text-muted-foreground leading-normal mt-0.5 space-y-1">
+                            <ReactMarkdown remarkPlugins={[remarkMath]} rehypePlugins={[rehypeKatex]}>
+                              {details.explanation}
+                            </ReactMarkdown>
+                          </div>
                         </div>
 
                         {details.shortcut && (
@@ -378,7 +398,11 @@ const CoachContent: React.FC = () => {
                             <span className="font-bold text-primary flex items-center gap-1">
                               <Sparkles size={12} className="fill-current" /> Fastest Mentor Shortcut:
                             </span>
-                            <p className="text-muted-foreground leading-normal mt-1">{details.shortcut}</p>
+                            <div className="text-muted-foreground leading-normal mt-1 space-y-1">
+                              <ReactMarkdown remarkPlugins={[remarkMath]} rehypePlugins={[rehypeKatex]}>
+                                {details.shortcut}
+                              </ReactMarkdown>
+                            </div>
                           </div>
                         )}
 
@@ -387,7 +411,11 @@ const CoachContent: React.FC = () => {
                             <span className="font-bold text-amber-500 flex items-center gap-1">
                               <AlertTriangle size={12} /> Avoid the Trap:
                             </span>
-                            <p className="text-muted-foreground leading-normal mt-1">{details.trap}</p>
+                            <div className="text-muted-foreground leading-normal mt-1 space-y-1">
+                              <ReactMarkdown remarkPlugins={[remarkMath]} rehypePlugins={[rehypeKatex]}>
+                                {details.trap}
+                              </ReactMarkdown>
+                            </div>
                           </div>
                         )}
                       </div>

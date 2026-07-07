@@ -90,7 +90,8 @@ Instructions:
 - Be extremely motivating but professional, using markdown for structures.
 - Reference the student's stats directly in your answer where appropriate.
 - Keep the response relatively concise (2-3 paragraphs max).
-- Utilize the chat history to remember preceding questions and context.`;
+- Utilize the chat history to remember preceding questions and context.
+- ALWAYS render mathematical equations, symbols, fractions, powers, and expressions using standard LaTeX formatting. Use double dollar signs ($$) for block equations and single dollar signs ($) for inline math. For example, write $E=mc^2$ or $x = \frac{-b \pm \sqrt{b^2-4ac}}{2a}$ instead of plain text, and $\log_b(x)$ instead of log_b(x). Never use plain text for math formulas.`;
 
     let aiResponseText = '';
 
