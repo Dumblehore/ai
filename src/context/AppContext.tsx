@@ -118,6 +118,7 @@ interface AppContextType {
   addQuestion: (q: Omit<Question, 'id'>) => void;
   deleteQuestion: (id: string) => void;
   toggleRecommendation: (id: string) => void;
+  addFlashcard: (category: Flashcard['category'], front: string, back: string, topic?: string) => Promise<void>;
 }
 
 const AppContext = createContext<AppContextType | undefined>(undefined);
@@ -377,6 +378,21 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     }
   };
 
+  const addFlashcard = async (category: Flashcard['category'], front: string, back: string, topic?: string) => {
+    try {
+      const res = await fetch('/api/flashcards', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ category, front, back, topic })
+      });
+      if (res.ok) {
+        await syncStateFromApi();
+      }
+    } catch (e) {
+      console.error('Failed to create flashcard:', e);
+    }
+  };
+
   const toggleRecommendation = async (id: string) => {
     if (!user) return;
     try {
@@ -421,6 +437,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         addQuestion,
         deleteQuestion,
         toggleRecommendation,
+        addFlashcard,
       }}
     >
       {children}

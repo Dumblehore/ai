@@ -17,7 +17,7 @@ import {
 import { motion, AnimatePresence } from 'framer-motion';
 
 export default function FlashcardDeck() {
-  const { flashcards, toggleFlashcardFavorite } = useApp();
+  const { flashcards, toggleFlashcardFavorite, addFlashcard } = useApp();
   
   // Local state for active filters & creation modal
   const [filterCategory, setFilterCategory] = useState<'All' | Flashcard['category'] | 'Favorites'>('All');
@@ -41,27 +41,14 @@ export default function FlashcardDeck() {
     return card.category === filterCategory;
   });
 
-  const handleAddCard = (e: React.FormEvent) => {
+  const handleAddCard = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!front || !back) return;
-    
-    // Quick local storage addition simulation
-    const newCard: Flashcard = {
-      id: 'f-' + Math.random().toString(36).substr(2, 9),
-      category,
-      front,
-      back,
-      isFavorite: false,
-      topic: topic || undefined
-    };
-
-    const saved = localStorage.getItem('cat_flashcards');
-    const list = saved ? JSON.parse(saved) : [];
-    list.push(newCard);
-    localStorage.setItem('cat_flashcards', JSON.stringify(list));
-
-    // Force page reload or trigger context refresh
-    window.location.reload();
+    await addFlashcard(category, front, back, topic || undefined);
+    setFront('');
+    setBack('');
+    setTopic('');
+    setShowAddModal(false);
   };
 
   const getCategoryIcon = (cat: Flashcard['category']) => {
