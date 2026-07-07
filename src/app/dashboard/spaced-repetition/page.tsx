@@ -2,6 +2,11 @@
 
 import React, { useState } from 'react';
 import { useApp } from '@/context/AppContext';
+import { preprocessLaTeX } from '@/lib/mathUtils';
+import ReactMarkdown from 'react-markdown';
+import remarkMath from 'remark-math';
+import rehypeKatex from 'rehype-katex';
+import 'katex/dist/katex.min.css';
 import { 
   Layers, 
   CheckCircle2, 
@@ -221,12 +226,16 @@ export default function SpacedRepetition() {
                   
                   {activeQuestion.passage && (
                     <div className="bg-secondary/40 border border-border p-3.5 rounded-xl text-xs max-h-36 overflow-y-auto leading-relaxed select-text font-serif italic mb-3">
-                      {activeQuestion.passage}
+                      <ReactMarkdown remarkPlugins={[remarkMath]} rehypePlugins={[rehypeKatex]}>
+                        {preprocessLaTeX(activeQuestion.passage)}
+                      </ReactMarkdown>
                     </div>
                   )}
 
                   <div className="text-sm font-semibold text-foreground leading-relaxed whitespace-pre-line select-text">
-                    {activeQuestion.questionText}
+                    <ReactMarkdown remarkPlugins={[remarkMath]} rehypePlugins={[rehypeKatex]}>
+                      {preprocessLaTeX(activeQuestion.questionText)}
+                    </ReactMarkdown>
                   </div>
 
                   {/* Option display (just visual preview, user can think or click show solution) */}
@@ -284,12 +293,20 @@ export default function SpacedRepetition() {
                         </div>
                         <div>
                           <span className="font-bold text-muted-foreground block uppercase text-[9px]">Step-by-step Solution:</span>
-                          <p className="text-muted-foreground mt-0.5">{activeQuestion.explanation}</p>
+                          <div className="text-muted-foreground mt-0.5 space-y-1">
+                            <ReactMarkdown remarkPlugins={[remarkMath]} rehypePlugins={[rehypeKatex]}>
+                              {preprocessLaTeX(activeQuestion.explanation)}
+                            </ReactMarkdown>
+                          </div>
                         </div>
                         {activeQuestion.shortcut && (
                           <div className="bg-primary/5 border border-primary/10 p-2.5 rounded-lg text-[11px]">
                             <span className="font-bold text-primary block">Fastest Shortcut:</span>
-                            <p className="text-muted-foreground mt-0.5">{activeQuestion.shortcut}</p>
+                            <div className="text-muted-foreground mt-0.5 space-y-1">
+                              <ReactMarkdown remarkPlugins={[remarkMath]} rehypePlugins={[rehypeKatex]}>
+                                {preprocessLaTeX(activeQuestion.shortcut)}
+                              </ReactMarkdown>
+                            </div>
                           </div>
                         )}
                       </div>

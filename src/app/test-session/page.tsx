@@ -4,6 +4,11 @@ import React, { useState, useEffect, useRef, Suspense } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useApp, TestAttempt } from '@/context/AppContext';
 import { Question } from '@/data/questionsBank';
+import ReactMarkdown from 'react-markdown';
+import remarkMath from 'remark-math';
+import rehypeKatex from 'rehype-katex';
+import 'katex/dist/katex.min.css';
+import { preprocessLaTeX } from '@/lib/mathUtils';
 import { 
   Calculator, 
   HelpCircle, 
@@ -498,7 +503,9 @@ const ExamSimulator: React.FC = () => {
                 <Info size={14} className="text-blue-600" /> Read the Passage / Caselet instructions below:
               </div>
               <div className="flex-1 overflow-y-auto p-5 text-sm leading-relaxed text-slate-800 whitespace-pre-line select-text font-serif">
-                {activeQuestion.passage}
+                <ReactMarkdown remarkPlugins={[remarkMath]} rehypePlugins={[rehypeKatex]}>
+                  {preprocessLaTeX(activeQuestion.passage)}
+                </ReactMarkdown>
               </div>
             </div>
           )}
@@ -515,7 +522,9 @@ const ExamSimulator: React.FC = () => {
             <div className="flex-1 overflow-y-auto p-6 space-y-6">
               {/* Question Text */}
               <div className="text-sm font-semibold leading-relaxed text-slate-800 whitespace-pre-line">
-                {activeQuestion.questionText}
+                <ReactMarkdown remarkPlugins={[remarkMath]} rehypePlugins={[rehypeKatex]}>
+                  {preprocessLaTeX(activeQuestion.questionText)}
+                </ReactMarkdown>
               </div>
 
               {/* Input Options */}
@@ -542,7 +551,11 @@ const ExamSimulator: React.FC = () => {
                             className="h-4 w-4 border-slate-300 text-blue-600 focus:ring-blue-500 pointer-events-none"
                           />
                         </div>
-                        <div className="flex-1">{opt}</div>
+                        <div className="flex-1">
+                          <ReactMarkdown remarkPlugins={[remarkMath]} rehypePlugins={[rehypeKatex]}>
+                            {preprocessLaTeX(opt)}
+                          </ReactMarkdown>
+                        </div>
                       </label>
                     );
                   })}

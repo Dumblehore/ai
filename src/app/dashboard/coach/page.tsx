@@ -7,6 +7,7 @@ import ReactMarkdown from 'react-markdown';
 import remarkMath from 'remark-math';
 import rehypeKatex from 'rehype-katex';
 import 'katex/dist/katex.min.css';
+import { preprocessLaTeX } from '@/lib/mathUtils';
 import { 
   Sparkles, 
   MessageSquare, 
@@ -195,7 +196,7 @@ const CoachContent: React.FC = () => {
                               rehypePlugins={[rehypeKatex]}
                               className="prose dark:prose-invert max-w-none text-xs break-words space-y-1.5"
                             >
-                              {msg.text}
+                              {preprocessLaTeX(msg.text)}
                             </ReactMarkdown>
                           ) : (
                             msg.text
@@ -379,7 +380,7 @@ const CoachContent: React.FC = () => {
 
                       <div className="bg-secondary/40 border border-border p-3 rounded-xl font-medium leading-relaxed text-foreground truncate max-h-16 whitespace-normal overflow-y-auto">
                         <ReactMarkdown remarkPlugins={[remarkMath]} rehypePlugins={[rehypeKatex]}>
-                          {details.questionText}
+                          {preprocessLaTeX(details.questionText)}
                         </ReactMarkdown>
                       </div>
 
@@ -388,7 +389,7 @@ const CoachContent: React.FC = () => {
                           <span className="font-bold text-emerald-600 dark:text-emerald-400 block">✓ Step-by-Step Explanation:</span>
                           <div className="text-muted-foreground leading-normal mt-0.5 space-y-1">
                             <ReactMarkdown remarkPlugins={[remarkMath]} rehypePlugins={[rehypeKatex]}>
-                              {details.explanation}
+                              {preprocessLaTeX(details.explanation)}
                             </ReactMarkdown>
                           </div>
                         </div>
@@ -400,7 +401,7 @@ const CoachContent: React.FC = () => {
                             </span>
                             <div className="text-muted-foreground leading-normal mt-1 space-y-1">
                               <ReactMarkdown remarkPlugins={[remarkMath]} rehypePlugins={[rehypeKatex]}>
-                                {details.shortcut}
+                                {preprocessLaTeX(details.shortcut)}
                               </ReactMarkdown>
                             </div>
                           </div>
@@ -413,7 +414,7 @@ const CoachContent: React.FC = () => {
                             </span>
                             <div className="text-muted-foreground leading-normal mt-1 space-y-1">
                               <ReactMarkdown remarkPlugins={[remarkMath]} rehypePlugins={[rehypeKatex]}>
-                                {details.trap}
+                                {preprocessLaTeX(details.trap)}
                               </ReactMarkdown>
                             </div>
                           </div>
