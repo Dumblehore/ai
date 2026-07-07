@@ -191,13 +191,14 @@ const CoachContent: React.FC = () => {
                             : 'bg-primary text-primary-foreground rounded-tr-none'
                         }`}>
                           {isAi ? (
-                            <ReactMarkdown 
-                              remarkPlugins={[remarkMath]} 
-                              rehypePlugins={[rehypeKatex]}
-                              className="prose dark:prose-invert max-w-none text-xs break-words space-y-1.5"
-                            >
-                              {preprocessLaTeX(msg.text)}
-                            </ReactMarkdown>
+                            <div className="prose dark:prose-invert max-w-none text-xs break-words space-y-1.5">
+                              <ReactMarkdown 
+                                remarkPlugins={[remarkMath]} 
+                                rehypePlugins={[rehypeKatex]}
+                              >
+                                {preprocessLaTeX(msg.text)}
+                              </ReactMarkdown>
+                            </div>
                           ) : (
                             msg.text
                           )}
