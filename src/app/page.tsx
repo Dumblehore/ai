@@ -15,6 +15,17 @@ export default function LandingPage() {
   const [loading, setLoading] = useState(false);
   const [isSignUp, setIsSignUp] = useState(false);
 
+  const [showAdminDemo, setShowAdminDemo] = useState(false);
+
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      const params = new URLSearchParams(window.location.search);
+      if (params.get('admin') === 'true') {
+        setShowAdminDemo(true);
+      }
+    }
+  }, []);
+
   // If user is already logged in, redirect to dashboard
   useEffect(() => {
     if (user) {
@@ -205,22 +216,26 @@ export default function LandingPage() {
               </button>
             </form>
 
-            <div className="relative my-6 text-center">
-              <div className="absolute inset-0 flex items-center"><div className="w-full border-t border-white/10" /></div>
-              <span className="relative bg-[#0d0d0f] px-3 text-xs text-muted-foreground uppercase">Or Demo Sign In</span>
-            </div>
+            {showAdminDemo && (
+              <>
+                <div className="relative my-6 text-center">
+                  <div className="absolute inset-0 flex items-center"><div className="w-full border-t border-white/10" /></div>
+                  <span className="relative bg-[#0d0d0f] px-3 text-xs text-muted-foreground uppercase">Or Demo Sign In</span>
+                </div>
 
-            <button
-              onClick={handleGoogleLogin}
-              disabled={loading}
-              className="w-full bg-white/[0.02] hover:bg-white/[0.06] border border-white/10 text-white font-semibold py-2.5 rounded-lg text-sm transition-all flex items-center justify-center gap-3"
-              title="Click to automatically sign in as the seed Admin account"
-            >
-              <svg className="h-4 w-4" viewBox="0 0 24 24">
-                <path fill="#EA4335" d="M12.24 10.285V14.4h6.887c-.648 2.41-2.519 4.13-5.136 4.13A5.71 5.71 0 0 1 8.28 12.8a5.71 5.71 0 0 1 5.711-5.73 5.62 5.62 0 0 1 3.86 1.53l3.05-3.048A9.94 9.94 0 0 0 13.99 3c-5.523 0-10 4.477-10 10s4.477 10 10 10c5.78 0 9.77-4.07 9.77-9.93 0-.6-.05-1.185-.15-1.785H12.24z"/>
-              </svg>
-              Sign In as Admin (One-Click)
-            </button>
+                <button
+                  onClick={handleGoogleLogin}
+                  disabled={loading}
+                  className="w-full bg-white/[0.02] hover:bg-white/[0.06] border border-white/10 text-white font-semibold py-2.5 rounded-lg text-sm transition-all flex items-center justify-center gap-3"
+                  title="Click to automatically sign in as the seed Admin account"
+                >
+                  <svg className="h-4 w-4" viewBox="0 0 24 24">
+                    <path fill="#EA4335" d="M12.24 10.285V14.4h6.887c-.648 2.41-2.519 4.13-5.136 4.13A5.71 5.71 0 0 1 8.28 12.8a5.71 5.71 0 0 1 5.711-5.73 5.62 5.62 0 0 1 3.86 1.53l3.05-3.048A9.94 9.94 0 0 0 13.99 3c-5.523 0-10 4.477-10 10s4.477 10 10 10c5.78 0 9.77-4.07 9.77-9.93 0-.6-.05-1.185-.15-1.785H12.24z"/>
+                  </svg>
+                  Sign In as Admin (One-Click)
+                </button>
+              </>
+            )}
 
             <div className="mt-6 text-center text-xs">
               <button 

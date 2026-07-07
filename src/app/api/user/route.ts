@@ -29,6 +29,74 @@ export async function GET(req: NextRequest) {
       return NextResponse.json({ error: 'User profile not found.' }, { status: 404 });
     }
 
+    // Fetch all questions to map questionId to section
+    const dbQuestions = await prisma.question.findMany({
+      select: { id: true, section: true }
+    });
+    const questionSectionMap = new Map(dbQuestions.map(q => [q.id, q.section]));
+
+    const formattedAttempts = user.attempts.map(attempt => {
+      const sectionBreakdown = {
+        VARC: { attempted: 0, correct: 0, timeSpent: 0 },
+        DILR: { attempted: 0, correct: 0, timeSpent: 0 },
+        QA: { attempted: 0, correct: 0, timeSpent: 0 }
+      };
+
+      const mistakeCounts = {
+        'Conceptual Error': 0,
+        'Calculation Error': 0,
+        'Careless Mistake': 0,
+        'Misread Question': 0,
+        'Poor Time Management': 0,
+        'Lucky Guess': 0,
+        'Incorrect Elimination': 0,
+        'Panic Under Time Pressure': 0
+      };
+
+      attempt.answers.forEach(ans => {
+        const rawSection = questionSectionMap.get(ans.questionId) || 'QA';
+        // Normalize section name to match keys
+        const section = (rawSection === 'VARC' || rawSection === 'DILR' || rawSection === 'QA') ? rawSection : 'QA';
+        
+        const isAnswered = ans.userAnswer && ans.userAnswer.trim() !== '';
+        
+        if (isAnswered) {
+          sectionBreakdown[section].attempted++;
+          if (ans.isCorrect) {
+            sectionBreakdown[section].correct++;
+          }
+        }
+        sectionBreakdown[section].timeSpent += ans.timeSpent;
+
+        if (ans.mistakeType && ans.mistakeType in mistakeCounts) {
+          mistakeCounts[ans.mistakeType as keyof typeof mistakeCounts]++;
+        }
+      });
+
+      return {
+        id: attempt.id,
+        title: attempt.title,
+        type: attempt.type,
+        date: attempt.date,
+        totalQuestions: attempt.totalQuestions,
+        attempted: attempt.attempted,
+        correct: attempt.correct,
+        score: attempt.score,
+        accuracy: attempt.accuracy,
+        timeSpent: attempt.timeSpent,
+        percentile: attempt.percentile,
+        sectionBreakdown,
+        mistakeCounts,
+        questionsAnswered: attempt.answers.map(ans => ({
+          questionId: ans.questionId,
+          userAnswer: ans.userAnswer,
+          isCorrect: ans.isCorrect,
+          timeSpent: ans.timeSpent,
+          mistakeType: ans.mistakeType || undefined
+        }))
+      };
+    });
+
     return NextResponse.json({
       profile: {
         id: user.id,
@@ -46,7 +114,7 @@ export async function GET(req: NextRequest) {
         lastActiveDate: user.lastActiveDate,
         recommendationsJson: user.recommendationsJson
       },
-      testHistory: user.attempts,
+      testHistory: formattedAttempts,
       activeGoals: user.goals,
       flashcards: user.flashcards,
       spacedRepetition: user.spacedCards.map(c => ({
